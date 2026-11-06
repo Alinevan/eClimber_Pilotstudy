@@ -1,5 +1,9 @@
-numpy
-pandas
-plotly
-scipy
-ezc3d
+ezc3d==1.7.2
+narwhals==2.28.0
+numpy==2.4.6
+packaging==26.3
+pandas==3.1.1
+plotly==7.1.0
+python-dateutil==4.0.0
+scipy==1.17.1
+tzdata==2026.6
