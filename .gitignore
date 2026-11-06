@@ -1,0 +1,25 @@
+# Participant and study data (never upload)
+data/
+*.c3d
+*.csv
+*.xlsx
+*.mat
+
+# Output
+figures/
+output/
+results/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+.ipynb_checkpoints/
+
+# Secrets
+.env
+
+# System files
+.DS_Store
+Thumbs.db
