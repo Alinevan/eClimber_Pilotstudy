@@ -23,7 +23,7 @@ Python code for my Master's thesis: Assistive Load and Muscle Demand During Supp
 3. Run `python plot_climbing_emg_force.py`
 
 ## Data
-Data files are not part of this repository because they contain participant data.
+Data files are not part of this repository because they contain participant data. Please adjust the data path accordingly in the config.py file.
 
 ## Author
 Aline Vandebroek, 2026
