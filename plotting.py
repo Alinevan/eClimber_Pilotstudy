@@ -103,15 +103,46 @@ def make_figure(direction, d, normalize=False, emg_unit=None):
 
     missing = [f"{k} {b}%" for k, src in (("EMG", emg), ("Force", force))
                for b in sorted(set(conditions) | set(cfg.EXPECTED_BWS)) if b not in src]
-    subtitle = f"<br><sup>Missing: {', '.join(missing)}</sup>" if missing else ""
+
+    # Synchronisation is successful only when both the EMG and force-side
+    # sync peaks were found for the same BWS condition.
+    sync_failed = []
+    for bws in sorted(set(emg) & set(force)):
+        emg_ok = emg[bws].get("sync_peaks") is not None
+        force_ok = (force[bws].get("sync_peaks") is not None
+                    and force[bws].get("sync_col") is not None)
+        if not (emg_ok and force_ok):
+            sync_failed.append(f"BWS {bws}%")
+
+    status_lines = []
+    if missing:
+        status_lines.append(f"Missing: {', '.join(missing)}")
+    if sync_failed:
+        status_lines.append(f"Synchronization failed for: {', '.join(sync_failed)}")
+    subtitle = "".join(f"<br><sup>{line}</sup>" for line in status_lines)
 
     fig.update_layout(
-        title=f"{direction.capitalize()} climbing: EMG and force by body weight support{subtitle}",
+        # Keep the title and missing-condition message above the legend.
+        title=dict(
+            text=f"{direction.capitalize()} climbing: EMG and force by body weight support{subtitle}",
+            x=0.5,
+            xanchor="center",
+            y=0.99,
+            yanchor="top",
+        ),
         height=max(600, 230 * n_rows),
+        margin=dict(t=155, r=40, b=60, l=70),
         barmode="group",
         template="plotly_white",
-        legend=dict(title="Condition (click to toggle)", groupclick="togglegroup",
-                    orientation="h", yanchor="bottom", y=1.0 + 30 / max(600, 230 * n_rows), x=0),
+        legend=dict(
+            title=dict(text="Condition (click to toggle)", side="left"),
+            groupclick="togglegroup",
+            orientation="h",
+            yanchor="top",
+            y=1.04,
+            x=0,
+            xanchor="left",
+        ),
         hovermode="x unified",
     )
     return fig
