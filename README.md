@@ -11,6 +11,39 @@ Python code for my Master's thesis: Assistive Load and Muscle Demand During Supp
    - Muscle activation per muscle, modality (vertical/horizontal) and BWS level (25/50/75%)
    - BWS force: mean, peak, SD, and ratio of measured to nominal force
 
+## Manual synchronisation
+
+For trials where the force recording is shifted and the fixed first-seconds
+search window does not contain the sync peaks, install the requirements and
+run:
+
+```text
+python manual_synchronisation.py --data /path/to/data --participant 3
+```
+
+The browser view shows the filtered left/right biceps EMG envelopes and all
+numeric raw force channels for each condition. You can crop the displayed
+filtered EMG and raw force independently; the raw source files are never
+modified. The cropped derived files can be saved under
+`output/manual_crops/P03/`.
+
+The synchronization mode defaults to position valleys when a position channel
+is available. Use Plotly's box-select tool to drag over the cropped force trace
+and choose the detection window. The tool finds the three most prominent
+valleys (or peaks if legacy mode is selected) and matches them to the EMG
+peaks. Clicking “Detect peaks and synchronize” overlays the extrema, shifts
+the force time axis for visual inspection, and saves the result to
+`output/manual_sync_report_P03.csv`.
+
+To use those manually selected offsets in the regular analysis outputs, run:
+
+```text
+python main.py --manual-sync-report /path/to/output/manual_sync_report_P03.csv
+```
+
+The original fixed-window batch synchronisation remains the default when this
+option is omitted and is available through `synchronisation.synchronize()`.
+
 ## Study conditions
 - Modality: vertical (top-rope) and horizontal (lateral bouldering)
 - BWS levels: 25%, 50%, 75% of body weight (if feasible with patient)

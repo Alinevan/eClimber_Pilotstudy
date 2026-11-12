@@ -49,6 +49,8 @@ def main():
     ap.add_argument("--normalize", action="store_true", help="normalise envelopes to peak per muscle")
     ap.add_argument("--emg-unit", default=None, help="unit label for EMG axes")
     ap.add_argument("--show", action="store_true", help="also open the figures in the browser")
+    ap.add_argument("--manual-sync-report", type=Path,
+                    help="apply offsets from manual_sync_report_P##.csv instead of fixed-window detection")
     args = ap.parse_args()
 
     root = ask_data_folder()
@@ -78,7 +80,14 @@ def main():
     emg_processing.process_all(data)
 
     print("3. Synchronising force to EMG")
-    sync = synchronisation.synchronize(data)
+    if args.manual_sync_report:
+        sync = synchronisation.synchronize_from_report(data, args.manual_sync_report)
+    else:
+        # Legacy fixed-window path. It is intentionally kept as the batch
+        # fallback; use manual_synchronisation.py when the force recording
+        # starts later or the first fixed SYNC_WINDOW_S seconds do not contain
+        # the sync peaks.
+        sync = synchronisation.synchronize(data)
     outcalc.save_table(sync, out / f"sync_report_{tag}.csv")
 
     print("4. Plotting")
