@@ -8,8 +8,8 @@ directly on the raw force plot, detect either position valleys or signal peaks
 in that window, and inspect the resulting shift before saving it to a report.
 
 Usage:
-    python manual_synchronisation.py
-    python manual_synchronisation.py --data /path/to/data --participant 3
+    python -m emg_force.manual_synchronisation
+    python -m emg_force.manual_synchronisation --data /path/to/data --participant 3
 
 The browser view shows the processed EMG envelopes for the left and right
 biceps and every numeric raw-force column. Cropping and saving only affects
@@ -27,11 +27,11 @@ import plotly.graph_objects as go
 from dash import Dash, Input, Output, State, ctx, dcc, html
 from plotly.subplots import make_subplots
 
-import config as cfg
-import data_loading
-import emg_processing
-import synchronisation
-from main import ask_data_folder, ask_participant
+from common.paths import output_subdirectory
+
+from . import config as cfg
+from . import emg_processing, io as data_loading, synchronisation
+from .cli import ask_participant, get_data_folder
 
 
 def _condition_values(data):
@@ -544,7 +544,7 @@ def main():
     parser.add_argument("--port", type=int, default=8050)
     args = parser.parse_args()
 
-    root = args.data.expanduser().resolve() if args.data else ask_data_folder()
+    root = get_data_folder(args.data)
     emg_dir, force_dir = data_loading.find_data_folders(root)
     available = data_loading.list_participants(emg_dir, force_dir)
     if not available:
@@ -555,8 +555,7 @@ def main():
 
     data = data_loading.load_all(emg_dir, force_dir, participant)
     emg_processing.process_all(data)
-    output_dir = root.parent / cfg.OUTPUT_FOLDER
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir = output_subdirectory(root, "summaries", cfg.OUTPUT_FOLDER)
     app = create_app(data, participant, output_dir)
     app.run(host=args.host, port=args.port, debug=False)
 

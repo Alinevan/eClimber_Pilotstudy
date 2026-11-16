@@ -3,7 +3,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-import config as cfg
+from . import config as cfg
 
 
 def color_for(bws: int) -> str:

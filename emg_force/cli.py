@@ -3,7 +3,7 @@
 
 Usage:
     pip install ezc3d numpy scipy pandas plotly
-    python main.py            (asks for the data folder and the participant number)
+    python -m emg_force.cli  (uses the configured data folder and asks for the participant number)
 
 Folder layout:
     <parent>/
@@ -15,21 +15,19 @@ Folder layout:
 import argparse
 from pathlib import Path
 
-import config as cfg
-import data_loading
-import emg_processing
-import synchronisation
-import plotting
-import output_calculations as outcalc
+from common.participants import participant_tag
+from common.paths import output_subdirectory, resolve_data_root
+
+from . import config as cfg
+from . import emg_processing, io as data_loading, output_calculations as outcalc
+from . import plotting, synchronisation
 
 
-def ask_data_folder():
-    while True:
-        text = input("Path to the data folder: ").strip().strip('"').strip("'")
-        path = Path(text).expanduser()
-        if text and path.is_dir():
-            return path.resolve()
-        print("  Folder not found, please try again.")
+def get_data_folder(explicit=None):
+    """Return the configured data folder without prompting on normal runs."""
+    root = resolve_data_root(explicit)
+    print(f"  Data folder: {root}")
+    return root
 
 
 def ask_participant(available):
@@ -46,6 +44,7 @@ def ask_participant(available):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--data", type=Path, help="optional override for the configured data folder")
     ap.add_argument("--normalize", action="store_true", help="normalise envelopes to peak per muscle")
     ap.add_argument("--emg-unit", default=None, help="unit label for EMG axes")
     ap.add_argument("--show", action="store_true", help="also open the figures in the browser")
@@ -53,7 +52,7 @@ def main():
                     help="apply offsets from manual_sync_report_P##.csv instead of fixed-window detection")
     args = ap.parse_args()
 
-    root = ask_data_folder()
+    root = get_data_folder(args.data)
     emg_dir, force_dir = data_loading.find_data_folders(root)
     print(f"  EMG folder:   {emg_dir.name}\n  Force folder: {force_dir.name}")
 
@@ -61,10 +60,10 @@ def main():
     if not available:
         raise SystemExit(f"No files ending with '_{cfg.PARTICIPANT_PREFIX}<number>' found.")
     participant = ask_participant(available)
-    tag = f"{cfg.PARTICIPANT_PREFIX}{participant:02d}"
+    tag = participant_tag(participant)
 
-    out = root.parent / cfg.OUTPUT_FOLDER        # next to the data folder, no participant subfolder
-    out.mkdir(parents=True, exist_ok=True)
+    plots = output_subdirectory(root, "plots/final", cfg.OUTPUT_FOLDER)
+    summaries = output_subdirectory(root, "summaries", cfg.OUTPUT_FOLDER)
 
     print(f"\n1. Loading data of {tag}")
     data = data_loading.load_all(emg_dir, force_dir, participant)
@@ -72,7 +71,7 @@ def main():
         raise SystemExit("No recognised condition files (horizontal/vertical + BWS %) for this participant.")
 
     avail = outcalc.availability_table(data)
-    outcalc.save_table(avail, out / f"data_availability_{tag}.csv")
+    outcalc.save_table(avail, summaries / f"data_availability_{tag}.csv")
     for _, r in avail[avail["note"] != "complete"].iterrows():
         print(f"  ! {r['direction']} {r['bws_percent']}%: {r['note']}")
 
@@ -88,7 +87,7 @@ def main():
         # starts later or the first fixed SYNC_WINDOW_S seconds do not contain
         # the sync peaks.
         sync = synchronisation.synchronize(data)
-    outcalc.save_table(sync, out / f"sync_report_{tag}.csv")
+    outcalc.save_table(sync, summaries / f"sync_report_{tag}.csv")
 
     print("4. Plotting")
     for direction in cfg.DIRECTIONS:
@@ -97,14 +96,14 @@ def main():
             continue
         fig = plotting.make_figure(direction, data[direction],
                                    normalize=args.normalize, emg_unit=args.emg_unit)
-        html = out / f"{direction}_climbing_{tag}.html"
+        html = plots / f"{direction}_climbing_{tag}.html"
         fig.write_html(html, include_plotlyjs="cdn")
         print(f"Saved {html}")
         if args.show:
             fig.show()
 
     print("5. Output calculations")
-    outcalc.save_table(outcalc.rms_table(data), out / f"emg_rms_summary_{tag}.csv")
+    outcalc.save_table(outcalc.rms_table(data), summaries / f"emg_rms_summary_{tag}.csv")
 
 
 if __name__ == "__main__":

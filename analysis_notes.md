@@ -132,13 +132,17 @@ Load raw data
 
 | Module | Responsibility |
 |---|---|
-| `config.py` | Analysis parameters and labels |
-| `data_loading.py` | File discovery, parsing, and raw-data loading |
-| `emg_processing.py` | EMG filtering and feature calculation |
-| `synchronisation.py` | EMG/force time alignment |
-| `plotting.py` | Interactive HTML figures |
-| `output_calculations.py` | Summary tables and saved outputs |
-| `main.py` | Analysis workflow |
+| `emg_force/config.py` | EMG/force analysis parameters and labels |
+| `emg_force/io.py` | EMG/force file discovery, parsing, and raw-data loading |
+| `emg_force/emg_processing.py` | EMG filtering and feature calculation |
+| `emg_force/synchronisation.py` | EMG/force time alignment |
+| `emg_force/plotting.py` | Interactive HTML figures |
+| `emg_force/output_calculations.py` | Summary tables and saved outputs |
+| `common/participants.py` | Shared participant-ID parsing |
+| `common/paths.py` | Shared data/output path helpers |
+| `usability/docx_reader.py` | Low-level Word table/form-field reader |
+| `usability/extraction.py` | Questionnaire answer extraction |
+| `usability/export.py` | Questionnaire CSV, Excel, and text outputs |
 
 ## 5. EMG preprocessing decisions
 

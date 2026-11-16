@@ -24,7 +24,7 @@ def save_table(df, path):
 
 def availability_table(data):
     """Which EMG / force files exist per direction and BWS level (missing levels are noted)."""
-    import config as cfg
+    from . import config as cfg
     rows = []
     for direction in cfg.DIRECTIONS:
         d = data.get(direction, {"emg": {}, "force": {}})

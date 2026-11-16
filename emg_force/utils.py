@@ -1,7 +1,7 @@
 """Small helpers shared by several modules."""
 import re
 from scipy.signal import butter, filtfilt
-import config as cfg
+from . import config as cfg
 
 
 def lowpass(x, fc, fs):

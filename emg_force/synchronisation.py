@@ -3,8 +3,8 @@ import numpy as np
 import pandas as pd
 from scipy.signal import find_peaks
 
-import config as cfg
-from utils import lowpass
+from . import config as cfg
+from .utils import lowpass
 
 
 def find_force_column(df, name):

@@ -5,8 +5,8 @@ import numpy as np
 from scipy.integrate import simpson
 from scipy.signal import butter, filtfilt
 
-import config as cfg
-from utils import lowpass
+from . import config as cfg
+from .utils import lowpass
 
 
 def process_emg(sig, fs):

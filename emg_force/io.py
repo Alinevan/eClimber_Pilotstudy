@@ -1,4 +1,8 @@
-"""Step 1: read raw EMG (.c3d) and force (.csv) files. No signal processing here."""
+"""Read raw EMG (.c3d) and force (.csv) files.
+
+This module is deliberately inside :mod:`emg_force`: the questionnaire
+reader has its own document-loading code in :mod:`usability`.
+"""
 import re
 from collections import defaultdict
 from pathlib import Path
@@ -11,28 +15,14 @@ try:
 except ImportError:
     raise SystemExit("ezc3d is required: pip install ezc3d")
 
-import config as cfg
-from utils import clean_label, lowpass
+from common.participants import parse_participant
+from common.paths import find_subfolder
+
+from . import config as cfg
+from .utils import clean_label, lowpass
 
 _KEYWORDS = "|".join(sorted(map(re.escape, cfg.DIRECTION_ALIASES), key=len, reverse=True))  # longest first
 _FNAME_RE = re.compile(rf"(?:^|[_\-\s])({_KEYWORDS})[_\-\s]*(?:bws)?[_\-\s]*(\d+)", re.IGNORECASE)
-
-
-_PARTICIPANT_RE = re.compile(rf"_{re.escape(cfg.PARTICIPANT_PREFIX)}0*(\d+)$", re.IGNORECASE)
-
-
-def parse_participant(path: Path):
-    """Return the participant number from the end of the file name (e.g. ..._P03 -> 3), or None."""
-    m = _PARTICIPANT_RE.search(path.stem)
-    return int(m.group(1)) if m else None
-
-
-def find_subfolder(root: Path, keyword: str):
-    """First subfolder of root whose name contains keyword (case-insensitive), or None."""
-    for d in sorted(root.iterdir()):
-        if d.is_dir() and keyword.lower() in d.name.lower():
-            return d
-    return None
 
 
 def find_data_folders(root: Path):

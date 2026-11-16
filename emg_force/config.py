@@ -1,4 +1,4 @@
-"""All settings in one place. Other modules do `import config as cfg`."""
+"""Settings specific to the EMG/force analysis pipeline."""
 
 # --- EMG processing ---
 BANDPASS_HZ = (20.0, 450.0)    # EMG band-pass

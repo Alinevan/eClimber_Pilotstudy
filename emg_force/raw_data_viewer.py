@@ -6,8 +6,8 @@ does not apply EMG filtering, rectification, envelope extraction, decimation,
 force filtering, synchronization, cropping, or normalization.
 
 Usage:
-    python raw_data_viewer.py
-    python raw_data_viewer.py --show
+    python -m emg_force.raw_data_viewer
+    python -m emg_force.raw_data_viewer --show
 
 Expected folder layout:
     <data folder>/
@@ -15,14 +15,18 @@ Expected folder layout:
         Force/  (*.csv)
 """
 import argparse
+from pathlib import Path
 
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-import config as cfg
-import data_loading
-from main import ask_data_folder, ask_participant
+from common.paths import output_subdirectory
+from common.participants import participant_tag
+
+from . import config as cfg
+from . import io as data_loading
+from .cli import ask_participant, get_data_folder
 
 
 def color_for(bws):
@@ -146,10 +150,11 @@ def make_raw_figure(direction, data):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--data", type=Path, help="optional override for the configured data folder")
     parser.add_argument("--show", action="store_true", help="also open the figures in a browser")
     args = parser.parse_args()
 
-    root = ask_data_folder()
+    root = get_data_folder(args.data)
     emg_dir, force_dir = data_loading.find_data_folders(root)
     print(f"  EMG folder:   {emg_dir.name}\n  Force folder: {force_dir.name}")
 
@@ -162,9 +167,8 @@ def main():
     if not data:
         raise SystemExit("No recognised raw condition files found.")
 
-    output = root.parent / cfg.OUTPUT_FOLDER
-    output.mkdir(parents=True, exist_ok=True)
-    tag = f"{cfg.PARTICIPANT_PREFIX}{participant:02d}"
+    output = output_subdirectory(root, "plots/raw", cfg.OUTPUT_FOLDER)
+    tag = participant_tag(participant)
     for direction in cfg.DIRECTIONS:
         if direction not in data:
             continue
