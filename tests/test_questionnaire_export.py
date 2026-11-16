@@ -36,6 +36,7 @@ class QuestionnaireExportTests(unittest.TestCase):
             {record["question_id"] for record in records if record["question_id"].endswith("_Bemerkungen")},
             {"A_Bemerkungen", "B_Bemerkungen", "C_Bemerkungen", "D_Bemerkungen", "E_Bemerkungen", "F_Bemerkungen"},
         )
+        self.assertIn("E_Bemerkungen", {record["question_id"] for record in records})
         self.assertTrue(any("E2" in warning for warning in warnings))
 
     def test_overview_keeps_conditions_separate(self):

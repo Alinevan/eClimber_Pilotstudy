@@ -17,6 +17,25 @@ D2_OPTIONS = (
     "Andere",
 )
 
+QUESTION_TEXT = {
+    "A1": "Die Sicherungsleine hat meine Bewegungsfreiheit während dem Klettern eingeschränkt.",
+    "A2": "Ich hatte beim Greifen nach einem neuen Griff das Gefühl, zur Seite gezogen/geschwungen zu werden.",
+    "A3": "Der Rope Spreader (Verbindungspunkt zur eClimber Sicherungsleine) ist während dem Klettern unangenehm mit meinem Kopf in Kontakt gekommen.",
+    "A4": "Ich musste meine Technik oder Wahl des Griffes aufgrund der Unterstützung ändern.",
+    "A5": "Ich konnte auf eine für mich natürliche Art und Weise klettern.",
+    "A6": "Während welchen Unterstützungsleveln mich die Sicherheitsleine und/oder der Klettergurt nicht am Klettern gehindert (bitte alle Zutreffenden ankreuzen)?",
+    "B1": "Wie wurde die Positionierung relativ zur Wand wahrgenommen?",
+    "C1": "Das Bedienungspanel war intuitiv zu verwenden.",
+    "C2": "Die Start-Stopp Knöpfe (seitlich des Panels) waren angenehm zu verwenden.",
+    "D1": "Würden Sie gerne einen Not-Stopp während dem Klettern bei sich tragen?",
+    "D2": "Falls ja, welche Funktionen sollte dieser haben? (bitte alle Zutreffenden ankreuzen)",
+    "E1": "Wie haben Sie die Ablass-Funktion wahrgenommen?",
+    "E2": "Haben Sie bedenken in Bezug auf die Ablass-Funktion? Falls ja, bitte angeben:",
+    "F1": "Würden Sie gerne gänzlich ohne die Unterstützung von jemand anderem Klettern können?",
+    "F2": "Wäre es für Sie akzeptierbar, auf eine Person angewiesen zu sein, die Ihren Rollstuhl, während dem Klettern für Sie vom Sturzbereich fortnimmt und danach wieder bringt?",
+    "F3": "Haben Sie weitere Bedenken in Bezug auf die Selbstständigkeit während dem Klettern mit dem eClimber?",
+}
+
 TABLE_CONDITION_QUESTIONS = {"A1", "A2", "A3", "A4", "A5"}
 TABLE_QUESTIONS = {"C1", "C2", "E1"}
 
@@ -29,7 +48,7 @@ QUESTION_ORDER = {
     "B1": 70, "B_Bemerkungen": 75,
     "C1": 80, "C2": 90, "C_Bemerkungen": 95,
     "D1": 100, "D2": 110, "D_Bemerkungen": 115,
-    "E1": 120, "E2": 130, "E2_Bedürfnis": 135, "E_Bemerkungen": 138,
+    "E1": 120, "E2": 130, "E_Bemerkungen": 135,
     "F1": 140, "F2": 150, "F3": 160, "F_Bemerkungen": 165,
     "Generelle Bemerkungen": 170,
 }

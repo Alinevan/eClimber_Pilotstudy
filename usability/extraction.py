@@ -26,6 +26,7 @@ _SECTION_HEADINGS = {
     "Selbstständigkeit (für Rollstuhl-Nutzende)": "F",
 }
 _REMARK_RE = re.compile(r"^\s*Bemerkung(?:en)?\s*:?(.*)$", re.IGNORECASE)
+_NEEDS_RE = re.compile(r"^\s*Bedürfnis(?:se)?\s*:?(.*)$", re.IGNORECASE)
 _GENERAL_RE = re.compile(r"^\s*Generelle Bemerkungen\s*:?(.*)$", re.IGNORECASE)
 
 
@@ -82,6 +83,21 @@ def _checkbox_answers(paragraph: Paragraph, options: tuple[str, ...]):
     return [option for option, field in zip(options, fields) if field.checked], None
 
 
+def _checkbox_paragraph(paragraphs, index: int) -> Paragraph:
+    """Find checkbox fields in the question paragraph or its answer line."""
+    paragraph = paragraphs[index]
+    if any(field.kind == "checkbox" for field in paragraph.fields):
+        return paragraph
+    for following in paragraphs[index + 1:]:
+        text = following.text.strip()
+        if (_question_id(text) or _section_heading(text) or _is_remark(text)
+                or _NEEDS_RE.match(text) or _GENERAL_RE.match(text)):
+            break
+        if any(field.kind == "checkbox" for field in following.fields):
+            return following
+    return paragraph
+
+
 def _extract_tables(document: Document, participant: str, source_file: str, order_start: int):
     records = []
     warnings = []
@@ -103,9 +119,10 @@ def _extract_tables(document: Document, participant: str, source_file: str, orde
                     order += 1
             elif question_id in TABLE_QUESTIONS:
                 section = question_id[0]
+                answer_type = "free_text" if question_id == "E1" else "text"
                 records.append(_record(
                     participant, source_file, section, question_id, row[1], row[2],
-                    "text", order=order,
+                    answer_type, order=order,
                 ))
                 order += 1
     return records, warnings, order
@@ -121,7 +138,7 @@ def _extract_direct_checkbox(paragraphs, participant, source_file, question_id,
     index = _find_paragraph_index(paragraphs, question_id)
     if index is None:
         return [], [f"{question_id}: question not found"], order
-    paragraph = paragraphs[index]
+    paragraph = _checkbox_paragraph(paragraphs, index)
     selected, warning = _checkbox_answers(paragraph, options)
     if warning:
         return [], [f"{question_id}: {warning}"], order
@@ -203,25 +220,31 @@ def _extract_text_and_remarks(paragraphs, participant, source_file, records, ord
                     following_text = following.text.strip()
                     if (_question_id(following_text) or _section_heading(following_text)
                             or _is_remark(following_text)
-                            or following_text.startswith("Bedürfnis:")
-                            or following_text.startswith("Generelle Bemerkungen:")):
+                            or _NEEDS_RE.match(following_text)
+                            or _GENERAL_RE.match(following_text)):
                         break
                     answer_parts.extend(field.value for field in following.fields
                                         if field.kind == "text" and field.value)
                     if following_text:
                         answer_parts.append(following_text)
             question_id = f"{current_section}_Bemerkungen" if current_section else "Bemerkungen"
+            question_label = "Bemerkungen"
             records.append(_record(
-                participant, source_file, current_section, question_id, "Bemerkungen",
+                participant, source_file, current_section, question_id, question_label,
                 " ".join(answer_parts), "free_text", order=order,
             ))
             if current_section:
                 found_section_remarks.add(current_section)
             order += 1
-        elif text.startswith("Bedürfnis:"):
+        elif _NEEDS_RE.match(text):
+            needs_match = _NEEDS_RE.match(text)
+            answer_parts = [needs_match.group(1).strip()] if needs_match and needs_match.group(1).strip() else []
+            answer_parts.extend(field.value for field in paragraph.fields
+                                if field.kind == "text" and field.value)
+            found_section_remarks.add("E")
             records.append(_record(
-                participant, source_file, "E", "E2_Bedürfnis", "Bedürfnis",
-                text.split(":", 1)[1].strip(), "free_text", order=order,
+                participant, source_file, "E", "E_Bemerkungen", "Bemerkungen",
+                " ".join(answer_parts), "free_text", order=order,
             ))
             order += 1
         else:
@@ -229,9 +252,12 @@ def _extract_text_and_remarks(paragraphs, participant, source_file, records, ord
             if not general_match:
                 continue
             found_general_remarks = True
+            answer_parts = [general_match.group(1).strip()] if general_match.group(1).strip() else []
+            answer_parts.extend(field.value for field in paragraph.fields
+                                if field.kind == "text" and field.value)
             records.append(_record(
                 participant, source_file, "", "Generelle Bemerkungen", "Generelle Bemerkungen",
-                general_match.group(1).strip(), "free_text", order=order,
+                " ".join(answer_parts), "free_text", order=order,
             ))
             order += 1
 
@@ -243,6 +269,16 @@ def _extract_text_and_remarks(paragraphs, participant, source_file, records, ord
             continue
         paragraph = paragraphs[index]
         text_fields = [field for field in paragraph.fields if field.kind == "text"]
+        if not text_fields:
+            for following in paragraphs[index + 1:]:
+                following_text = following.text.strip()
+                if (_question_id(following_text) or _section_heading(following_text)
+                        or _is_remark(following_text) or _NEEDS_RE.match(following_text)
+                        or _GENERAL_RE.match(following_text)):
+                    break
+                text_fields = [field for field in following.fields if field.kind == "text"]
+                if text_fields:
+                    break
         value = text_fields[0].value if text_fields else ""
         if not text_fields:
             warnings.append(f"{question_id}: text field not found")

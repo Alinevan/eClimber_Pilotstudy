@@ -64,6 +64,10 @@ Questionnaire documents are read from a folder whose name contains
 The extractor reads Word tables, legacy checkbox fields, text fields, and
 visible remarks. It ignores the U1–U4 research-question box.
 
+Section E is reported with `Bemerkungen`, consistently with the other
+questionnaire sections. The final `Generelle Bemerkungen` field is kept
+separately.
+
 The main data folder is configured once in `common/paths.py`, so it is used
 automatically:
 
