@@ -31,6 +31,14 @@ FORCE_FOLDER_KEYWORD = "force"
 # --- EMG channels (as labelled in the C3D) ---
 EMG_LABELS = ["L.Biceps Br.", "R.Biceps Br.", "L.Med. Triceps", "R.Med. Triceps",
               "L.Infraspin.", "R.Infraspin.", "L.Flex.Carp.R", "R.Flex.Carp.R"]
+# The C3D channel keys above are retained for loading compatibility. These are
+# the anatomically corrected labels shown to users in plots.
+EMG_DISPLAY_LABELS = {
+    "L.Infraspin.": "L. Supraspinatus",
+    "R.Infraspin.": "R. Supraspinatus",
+    "L.Flex.Carp.R": "L. Flexor Carpi Ulnaris",
+    "R.Flex.Carp.R": "R. Flexor Carpi Ulnaris",
+}
 # Used only when EMG_LABELS is empty: analog channels containing these are skipped
 EMG_EXCLUDE_KEYWORDS = ["force", "trigger", "sync", "acc", "gyro", "mag", "battery", "switch", "Emg"]
 
@@ -38,16 +46,23 @@ EMG_EXCLUDE_KEYWORDS = ["force", "trigger", "sync", "acc", "gyro", "mag", "batte
 MUSCLE_GROUP_MAP = {}
 
 # --- Synchronisation EMG <-> force ---
-SYNC_EMG_LABEL = "L.Biceps Br."         # EMG channel with the sync contractions
+SYNC_EMG_LABEL = "R.Biceps Br."         # default EMG channel with the sync contractions
 # SYNC_FORCE_COLUMN = "Force Actual__N"
-SYNC_FORCE_COLUMN = "RPM Motor 1__RPM"  # force column with the sync peaks
+SYNC_FORCE_COLUMN = "RPM Motor 1__RPM"  # fallback default in the manual selector
 SYNC_N_PEAKS = 3
-SYNC_WINDOW_S = 20.0                    # look for peaks in the first N seconds
+SYNC_WINDOW_S = 20.0                    # initial size of the manual EMG window
 SYNC_MIN_PEAK_DISTANCE_S = 1
+SYNC_EMG_MIN_PEAK_DISTANCE_S = 0.35     # EMG sync pulses may be closer than force dips
 SYNC_FORCE_LP_HZ = 20.0                 # low-pass used only for force peak detection
-SYNC_FORCE_INVERT = False               # True if the sync peaks point downwards
-SYNC_MAX_SPREAD_S = 0.6                 # warn if peak offsets disagree by more than this
+SYNC_FORCE_INVERT = False               # used only if manual signal-peak mode is selected
+CALCULATION_START_DELAY_S = 1.0         # start analysis after the final sync event
 CROP_TO_EMG = True                      # crop force to the EMG recording duration
+
+# Interactive synchronization marker colors; these are deliberately distinct
+# from the red/orange EMG traces and the force/position traces.
+SYNC_EMG_DETECTION_COLOR = "#8e44ad"    # purple detection trace
+SYNC_EMG_PEAK_COLOR = "#39ff14"         # bright green EMG peak crosses
+SYNC_POSITION_PEAK_COLOR = SYNC_EMG_PEAK_COLOR  # bright green position valley crosses
 
 # --- Plotting ---
 COLORS = {25: "#1f77b4", 50: "#ff7f0e", 75: "#2ca02c"}

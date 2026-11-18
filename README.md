@@ -13,6 +13,23 @@ usability/    Word questionnaire extraction and overview exports
 tests/        small automated checks for shared and questionnaire logic
 ```
 
+### EMG/force script overview
+
+| Script/module | Role |
+|---|---|
+| `emg_force/cli.py` | Main manual-first workflow and final output generation |
+| `emg_force/manual_synchronisation.py` | Interactive EMG/force cropping, window selection, peak/dip detection, and report creation |
+| `emg_force/io.py` | Loads and pairs EMG/force files by participant, direction, and BWS |
+| `emg_force/emg_processing.py` | EMG filtering, rectification, windowed envelope, RMS, and iEMG calculations |
+| `emg_force/synchronisation.py` | Detects events inside user-selected windows and applies saved manual synchronization reports |
+| `emg_force/plotting.py` | Final synchronized HTML plots and event/window markers |
+| `emg_force/output_calculations.py` | Availability and EMG summary CSV tables |
+| `emg_force/raw_data_viewer.py` | Separate raw-data inspection tool; not part of the main workflow |
+| `emg_force/config.py` | Central analysis settings and channel labels |
+
+The main workflow is manual by design. The old fixed-window automatic
+synchronization function has been removed from the active code.
+
 There is intentionally no `pyproject.toml`. Install the packages listed in
 `requirements.txt` in the active Python environment.
 
@@ -32,17 +49,54 @@ Run the main workflow with:
 python -m emg_force.cli
 ```
 
-For trials where the force recording is shifted, use the manual tool:
+The main workflow always uses the interactive manual crop and synchronisation
+process. If a saved manual report already exists, the workflow asks whether it
+should be reused. Otherwise it opens the manual interface:
+
+```text
+python -m emg_force.cli
+```
+
+The manual workflow is divided into two separate browser stages. Stage 1 walks
+through every available paired direction/BWS condition in order. The user adjusts the
+independently zoomable EMG and force/position plots, then presses “Save this
+condition and go to next”; pressing it with the full range selected saves the
+full recording. Previously saved ranges are reloaded when returning to a
+condition. Conditions for which one raw file is absent are reported in the
+availability table but are not included in the workflow count. After Stage 1 is
+complete, Stage 2 loads only those saved crop files and walks through the same
+available conditions for EMG peak-window and force-position dip-window
+selection. Each synchronization is saved with “Save synchronization and go to
+next”.
+
+After synchronization, the green shaded calculation window is shown in both
+the EMG and force/position plots. It starts one second after the final
+synchronization valley. For vertical trials it ends at the post-synchronization
+global position maximum; for horizontal trials it ends at a sustained return
+toward the baseline around the final valley. For horizontal trials, click the
+desired endpoint on the position plot, or use the horizontal endpoint slider,
+to replace only the automatically detected end while keeping the start fixed.
+
+The intermediate files are kept separately: cropped signals are stored in
+`output/summaries/manual_crops/P##/`, selected detection windows in
+`manual_detection_windows_P##.csv`, and successful synchronization results in
+`manual_sync_report_P##.csv`. A complete existing manual synchronization report
+is checked before processing starts; the workflow asks whether it should be
+reused.
+
+To open the manual interface independently:
 
 ```text
 python -m emg_force.manual_synchronisation --data /path/to/data --participant 3
 ```
 
-To apply a saved manual synchronization report in the regular workflow:
+To explicitly reuse a saved manual report in the main workflow:
 
 ```text
 python -m emg_force.cli --manual-sync-report /path/to/output/manual_sync_report_P03.csv
 ```
+
+There is no automatic synchronization fallback in the main workflow.
 
 The raw-data viewer can be run with:
 
@@ -54,7 +108,7 @@ python -m emg_force.raw_data_viewer
 
 - Modality: vertical (top-rope) and horizontal (lateral bouldering)
 - BWS levels: 25%, 50%, 75% of body weight (if feasible with patient)
-- EMG: biceps brachii, triceps, infraspinatus, flexor ulnaris, erector spinae
+- EMG: biceps brachii, triceps, supraspinatus, flexor carpi ulnaris, erector spinae
 - No MVC normalization
 
 ## Usability questionnaires

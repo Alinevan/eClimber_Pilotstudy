@@ -54,7 +54,8 @@ def make_raw_figure(direction, data):
             if channel not in force_channels:
                 force_channels.append(channel)
 
-    titles = [f"Raw EMG: {channel}" for channel in emg_channels]
+    titles = [f"Raw EMG: {cfg.EMG_DISPLAY_LABELS.get(channel, channel)}"
+              for channel in emg_channels]
     titles += [f"Raw force: {channel}" for channel in force_channels]
     if not titles:
         raise ValueError(f"No EMG or force channels found for {direction}.")
