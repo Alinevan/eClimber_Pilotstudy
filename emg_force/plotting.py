@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from . import config as cfg
+from .emg_processing import channel_side_and_muscle
 from .utils import lowpass
 
 
@@ -125,7 +126,17 @@ def add_peak_markers(fig, row, bws, peak_t, t, y, label,
                   row=row, col=1)
 
 
-def make_figure(direction, d, normalize=False, emg_unit=None):
+def _display_muscle_name(muscle):
+    """Return the configured display name for a side-independent muscle key."""
+    for side in ("L", "R"):
+        label = cfg.EMG_DISPLAY_LABELS.get(f"{side}.{muscle}")
+        if label:
+            return label[3:] if label.startswith(f"{side}. ") else label
+    return muscle
+
+
+def make_figure(direction, d, normalize=False, emg_unit=None,
+                emg_outcomes=None, cci_outcomes=None, force_outcomes=None):
     emg, force = d["emg"], d["force"]
     if emg_unit is None:
         emg_unit = next((c["unit"] for c in emg.values() if c.get("unit")), "µV")
@@ -152,8 +163,62 @@ def make_figure(direction, d, normalize=False, emg_unit=None):
             peak[m] = max(vals) if vals and max(vals) > 0 else 1.0
 
     titles = [f"EMG envelope: {cfg.EMG_DISPLAY_LABELS.get(m, m)}" for m in muscles] \
-        + [f"Force: {c}" for c in force_cols] \
-        + ["EMG RMS per muscle", "Integrated EMG (area under envelope)"]
+        + [f"Force: {c}" for c in force_cols]
+
+    # The summary panels use bilateral values to match the paper's primary
+    # outcomes. Left/right values remain available in the CSV summaries.
+    bar_specs = []
+    if emg_outcomes is not None and not emg_outcomes.empty:
+        bilateral = emg_outcomes[
+            (emg_outcomes["direction"].astype(str) == str(direction)) &
+            (emg_outcomes["side"] == "bilateral")
+        ]
+        outcome_muscles = list(dict.fromkeys(bilateral["muscle"].tolist()))
+        preferred = []
+        for channel in cfg.EMG_LABELS:
+            _side, muscle = channel_side_and_muscle(channel)
+            if muscle in outcome_muscles and muscle not in preferred:
+                preferred.append(muscle)
+        outcome_muscles = preferred + [m for m in outcome_muscles if m not in preferred]
+        if outcome_muscles:
+            bar_specs.extend([
+                ("emg", "mean_envelope_raw", "Mean raw envelope (bilateral)",
+                 f"EMG amplitude ({emg_unit})", outcome_muscles),
+                ("emg", "mean_envelope_normalized", "Mean normalized envelope (bilateral)",
+                 "% of participant/muscle envelope peak", outcome_muscles),
+                ("emg", "rms_raw", "Raw RMS (bilateral)",
+                 f"RMS ({emg_unit})", outcome_muscles),
+                ("emg", "rms_normalized", "Normalized RMS (bilateral)",
+                 "% of participant/muscle RMS reference", outcome_muscles),
+                ("emg", "iemg_raw", "Raw integrated EMG (bilateral)",
+                 f"iEMG ({emg_unit}·s)", outcome_muscles),
+                ("emg", "iemg_normalized", "Normalized integrated EMG (bilateral)",
+                 "% peak·s", outcome_muscles),
+            ])
+
+    if cci_outcomes is not None and not cci_outcomes.empty:
+        cci_rows = cci_outcomes[cci_outcomes["direction"].astype(str) == str(direction)]
+        if not cci_rows.empty:
+            bar_specs.append((
+                "cci", None, "Biceps–triceps co-contraction index",
+                "CCI (%)", ["Left CCI", "Right CCI", "Bilateral CCI"],
+            ))
+
+    if force_outcomes is not None and not force_outcomes.empty:
+        force_rows = force_outcomes[
+            force_outcomes["direction"].astype(str) == str(direction)
+        ]
+        if not force_rows.empty:
+            bar_specs.extend([
+                ("force", "force_N", "Force summary during climbing", "Force (N)",
+                 ["Mean force", "Nominal force", "Peak force", "SD", "RMSE"]),
+                ("force", "force_ratio", "Actual-to-nominal force ratio", "Ratio (-)",
+                 ["Actual / nominal"]),
+                ("force", "force_variability", "Force variability relative to target", "%",
+                 ["CV", "SD / nominal"]),
+            ])
+
+    titles += [spec[2] for spec in bar_specs]
     n_rows = len(titles)
     fig = make_subplots(rows=n_rows, cols=1, subplot_titles=titles,
                         vertical_spacing=min(0.06, 0.6 / n_rows))
@@ -230,22 +295,75 @@ def make_figure(direction, d, normalize=False, emg_unit=None):
         fig.update_yaxes(title_text="Force", row=row, col=1)
         row += 1
 
-    # RMS and iEMG bars (same legend groups, so they toggle with the curves)
-    for key, ylab in (("rms", f"RMS ({emg_unit})"), ("iemg", f"iEMG ({emg_unit}·s)")):
-        for bws in conditions:
-            if bws not in emg:
-                continue
-            kw = legend_kw(bws)
-            kw.pop("line")
-            fig.add_trace(go.Bar(
-                                 x=[cfg.EMG_DISPLAY_LABELS.get(m, m) for m in muscles],
-                                 y=[emg[bws][key].get(m, np.nan) for m in muscles],
-                                 marker_color=color_for(bws), **kw), row=row, col=1)
+    # Summary bars use the same BWS legend groups as the time-series traces.
+    for kind, metric, title, ylab, categories in bar_specs:
+        if kind == "emg":
+            rows = emg_outcomes[
+                (emg_outcomes["direction"].astype(str) == str(direction)) &
+                (emg_outcomes["side"] == "bilateral")
+            ]
+            x_values = [_display_muscle_name(muscle) for muscle in categories]
+            for bws in conditions:
+                subset = rows[rows["bws_percent"] == bws].set_index("muscle")
+                if subset.empty:
+                    continue
+                kw = legend_kw(bws)
+                kw.pop("line")
+                fig.add_trace(go.Bar(
+                    x=x_values,
+                    y=[subset[metric].get(muscle, np.nan) for muscle in categories],
+                    marker_color=color_for(bws), **kw,
+                ), row=row, col=1)
+        elif kind == "cci":
+            rows = cci_outcomes[
+                cci_outcomes["direction"].astype(str) == str(direction)
+            ]
+            x_values = categories
+            for bws in conditions:
+                subset = rows[rows["bws_percent"] == bws]
+                if subset.empty:
+                    continue
+                values = subset.iloc[-1]
+                kw = legend_kw(bws)
+                kw.pop("line")
+                fig.add_trace(go.Bar(
+                    x=x_values,
+                    y=[values.get("cci_left_percent", np.nan),
+                       values.get("cci_right_percent", np.nan),
+                       values.get("cci_bilateral_percent", np.nan)],
+                    marker_color=color_for(bws), **kw,
+                ), row=row, col=1)
+        else:
+            rows = force_outcomes[
+                force_outcomes["direction"].astype(str) == str(direction)
+            ]
+            x_values = categories
+            for bws in conditions:
+                subset = rows[rows["bws_percent"] == bws]
+                if subset.empty:
+                    continue
+                values = subset.iloc[-1]
+                if metric == "force_N":
+                    y_values = [values.get("mean_force_N", np.nan),
+                                values.get("nominal_force_N", np.nan),
+                                values.get("peak_force_N", np.nan),
+                                values.get("force_SD_N", np.nan),
+                                values.get("force_RMSE_N", np.nan)]
+                elif metric == "force_ratio":
+                    y_values = [values.get("actual_to_nominal_ratio", np.nan)]
+                else:
+                    y_values = [values.get("force_CV_percent", np.nan),
+                                values.get("force_SD_percent_nominal", np.nan)]
+                kw = legend_kw(bws)
+                kw.pop("line")
+                fig.add_trace(go.Bar(
+                    x=x_values, y=y_values, marker_color=color_for(bws), **kw,
+                ), row=row, col=1)
         fig.update_yaxes(title_text=ylab, row=row, col=1)
         row += 1
 
     # Link all time axes (zoom one, zoom all); label the last time axis
-    n_time = n_rows - 2
+    n_time = len(muscles) + len(force_cols)
     for r in range(1, n_time + 1):
         fig.update_xaxes(matches="x", row=r, col=1)
         for bws in conditions:
@@ -264,9 +382,8 @@ def make_figure(direction, d, normalize=False, emg_unit=None):
                 fig.add_trace(
                     go.Scatter(
                         x=[x0, x1, x1, x0], y=[y0, y0, y1, y1],
-                        mode="lines", fill="toself",
+                        mode="none", fill="toself",
                         fillcolor=color_for(bws), opacity=0.10,
-                        line=dict(color=color_for(bws), width=1, dash="dash"),
                         hoverinfo="skip",
                         name=f"BWS {bws}% calculation window",
                         legendgroup=f"bws{bws}", showlegend=False,

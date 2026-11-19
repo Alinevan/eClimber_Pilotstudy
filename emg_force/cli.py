@@ -257,21 +257,39 @@ def main():
     for issue in issues:
         print(f"  ! No windowed EMG outcomes: {issue}")
 
-    print("5. Plotting")
+    print("5. Preparing outcome summaries for plots")
+    emg_outcomes = outcalc.emg_outcomes_table(data, participant)
+    cci_outcomes = outcalc.cci_table(data, participant)
+    try:
+        force_outcomes, force_issues = outcalc.force_outcomes_table(
+            data, sync, force_dir, participant
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        raise SystemExit(str(exc)) from exc
+    for issue in force_issues:
+        print(f"  ! No force outcome: {issue}")
+
+    print("6. Plotting")
     for direction in cfg.DIRECTIONS:
         if direction not in data:
             print(f"No data for {direction} climbing.")
             continue
         fig = plotting.make_figure(direction, data[direction],
-                                   normalize=args.normalize, emg_unit=args.emg_unit)
+                                   normalize=args.normalize, emg_unit=args.emg_unit,
+                                   emg_outcomes=emg_outcomes,
+                                   cci_outcomes=cci_outcomes,
+                                   force_outcomes=force_outcomes)
         html = plots / f"{direction}_climbing_{tag}.html"
         fig.write_html(html, include_plotlyjs="cdn")
         print(f"Saved {html}")
         if args.show:
             fig.show()
 
-    print("6. Output calculations")
+    print("7. Output calculations")
     outcalc.save_table(outcalc.rms_table(data), summaries / f"emg_rms_summary_{tag}.csv")
+    outcalc.save_table(emg_outcomes, summaries / f"emg_outcomes_{tag}.csv")
+    outcalc.save_table(cci_outcomes, summaries / f"cci_outcomes_{tag}.csv")
+    outcalc.save_table(force_outcomes, summaries / f"force_outcomes_{tag}.csv")
 
 
 if __name__ == "__main__":

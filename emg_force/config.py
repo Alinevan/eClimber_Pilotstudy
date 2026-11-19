@@ -9,6 +9,12 @@ PLOT_FS_HZ = 100.0             # envelopes are decimated to this rate for plotti
 # --- Force ---
 FORCE_FS_DEFAULT = 1000.0      # used only if a force CSV has no time column
 FORCE_LP_HZ = None             # e.g. 10.0 to low-pass the force; None = raw
+FORCE_OUTCOME_COLUMN = "Force Actual__N"  # measured rope force for force outcomes
+NOMINAL_FORCE_FILENAME = "Nominal_F_Values.xlsx"
+NOMINAL_FORCE_KG_TO_N = 10.0   # eClimber protocol: 10 N per kilogram setting
+
+# --- EMG outcomes ---
+NORMALIZATION_MOVING_AVERAGE_S = 0.5  # paper's participant/muscle reference window
 
 # --- File naming ---
 # Condition = keyword at the START of the file name (or after "_"/"-"), followed by the BWS level,
