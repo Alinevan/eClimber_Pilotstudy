@@ -102,7 +102,8 @@ After the synchronized climbing windows are applied, the workflow retains the
 raw windowed EMG outcomes and also calculates paper-style normalized outcomes.
 The outputs include side-specific and bilateral mean envelope amplitude, RMS,
 and integrated EMG, as well as biceps-triceps CCI. Force outcomes use the
-`Force Actual__N` column and read nominal target settings in kilograms from
+`Force Actual__N` column, converts the exported measured values to N with the
+configured scale factor, and reads nominal target settings in kilograms from
 `Force/Nominal_F_Values.xlsx`; those settings are converted with the protocol's
 10 N/kg factor. The force summary includes mean force, actual/nominal ratio,
 SD, SD as a percentage of nominal force, CV, peak force, and RMSE.
@@ -111,7 +112,20 @@ The additional summary files are written under `output/summaries/`:
 
 - `emg_outcomes_P##.csv` — raw and normalized EMG outcomes for left, right, and bilateral values;
 - `cci_outcomes_P##.csv` — left, right, and bilateral biceps-triceps CCI; and
-- `force_outcomes_P##.csv` — target lookup and force-delivery outcomes.
+- `force_outcomes_P##.csv` — target lookup, force-delivery outcomes, and climbing-window start, end, and duration.
+
+The paper-style four-panel EMG activation figure can be rebuilt from the saved
+outcome summaries without rerunning the analysis windows:
+
+```bash
+.venv/bin/python -m emg_force.paper_figure \
+  --summaries /path/to/Data_Analysis/Output/summaries \
+  --output paper_figures/figure4_emg_activation_P01_P02.html
+```
+
+The figure uses bilateral mean normalized envelope amplitude. Filled markers
+show vertical climbing and open markers show horizontal climbing; black lines
+are P01 and grey lines are P02.
 
 The raw-data viewer can be run with:
 

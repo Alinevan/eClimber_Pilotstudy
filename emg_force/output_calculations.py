@@ -218,7 +218,14 @@ def force_outcomes_table(data, sync_report, force_dir, participant):
                 continue
 
             t = np.asarray(force["t"], dtype=float)
-            measured = force["forces"][cfg.FORCE_OUTCOME_COLUMN].to_numpy(dtype=float)
+            # The eClimber export stores the measured-force values at one-tenth
+            # of their physical Newton values, while the nominal lookup is
+            # already converted to N. Keep raw data and timing unchanged, but
+            # convert the measured samples before calculating all outcomes.
+            measured = (
+                force["forces"][cfg.FORCE_OUTCOME_COLUMN].to_numpy(dtype=float)
+                * cfg.FORCE_MEASURED_SCALE
+            )
             keep = np.isfinite(t) & np.isfinite(measured) & (t >= start_s) & (t <= end_s)
             values = measured[keep]
             if values.size == 0:

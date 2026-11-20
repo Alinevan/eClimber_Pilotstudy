@@ -268,6 +268,8 @@ def make_figure(direction, d, normalize=False, emg_unit=None,
         for bws in conditions:
             if bws in force and col in force[bws]["forces"].columns:
                 y = force[bws]["forces"][col].to_numpy()
+                if col == cfg.FORCE_OUTCOME_COLUMN:
+                    y = y * cfg.FORCE_MEASURED_SCALE
                 # Force time has already received the synchronization offset
                 # in synchronize_from_report. Rebase it to the EMG crop start
                 # so the aligned EMG and force traces share the same zero.

@@ -10,6 +10,7 @@ PLOT_FS_HZ = 100.0             # envelopes are decimated to this rate for plotti
 FORCE_FS_DEFAULT = 1000.0      # used only if a force CSV has no time column
 FORCE_LP_HZ = None             # e.g. 10.0 to low-pass the force; None = raw
 FORCE_OUTCOME_COLUMN = "Force Actual__N"  # measured rope force for force outcomes
+FORCE_MEASURED_SCALE = 10.0    # exported measured-force values are one-tenth of N
 NOMINAL_FORCE_FILENAME = "Nominal_F_Values.xlsx"
 NOMINAL_FORCE_KG_TO_N = 10.0   # eClimber protocol: 10 N per kilogram setting
 
@@ -58,7 +59,7 @@ SYNC_FORCE_COLUMN = "RPM Motor 1__RPM"  # fallback default in the manual selecto
 SYNC_N_PEAKS = 3
 SYNC_WINDOW_S = 20.0                    # initial size of the manual EMG window
 SYNC_MIN_PEAK_DISTANCE_S = 1
-SYNC_EMG_MIN_PEAK_DISTANCE_S = 0.35     # EMG sync pulses may be closer than force dips
+SYNC_EMG_MIN_PEAK_DISTANCE_S = 0.35     # legacy adaptive EMG detector; currently inactive
 SYNC_FORCE_LP_HZ = 20.0                 # low-pass used only for force peak detection
 SYNC_FORCE_INVERT = False               # used only if manual signal-peak mode is selected
 CALCULATION_START_DELAY_S = 1.0         # start analysis after the final sync event

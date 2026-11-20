@@ -71,13 +71,13 @@ def emg_sync_signal(t, x, lp_hz=None):
 
 
 def find_emg_sync_peaks_in_window(t, x, start_s, end_s, lp_hz=None):
-    """Find exactly three robust EMG sync peaks inside a selected window.
+    """Find exactly three EMG sync peaks using the position-detector spacing.
 
-    EMG synchronization contractions can be close together and may have
-    different amplitudes. The EMG path therefore uses adaptive prominence and
-    distance thresholds, then falls back to the three strongest local maxima
-    if the initial threshold is too strict. Force/position detection keeps its
-    separate, stricter detector above.
+    The EMG and rope-position events represent the same three physical
+    synchronization events, so the active detector uses the same 1-second
+    minimum inter-event distance as the position detector. The former adaptive
+    EMG detector is retained below as commented legacy code for comparison or
+    later reactivation.
     """
     t = np.asarray(t, dtype=float)
     x = np.asarray(x, dtype=float)
@@ -95,40 +95,42 @@ def find_emg_sync_peaks_in_window(t, x, start_s, end_s, lp_hz=None):
     if not np.isfinite(amplitude) or amplitude <= 0:
         return None
 
-    # Start with a conservative detector, then relax only if fewer than three
-    # events are found. The selected window is the user's primary constraint.
-    distances_s = (
-        cfg.SYNC_EMG_MIN_PEAK_DISTANCE_S,
-        0.25,
-    )
-    prominence_fractions = (0.10, 0.05, 0.02, 0.01)
-    for distance_s in distances_s:
-        distance = max(1, int(round(distance_s * fs)))
-        for fraction in prominence_fractions:
-            idx, props = find_peaks(
-                x,
-                distance=distance,
-                prominence=max(fraction * amplitude, np.finfo(float).eps),
-            )
-            if len(idx) >= cfg.SYNC_N_PEAKS:
-                chosen = idx[np.argsort(props["prominences"])[-cfg.SYNC_N_PEAKS:]]
-                return np.sort(t[chosen])
+    distance = max(1, int(round(cfg.SYNC_MIN_PEAK_DISTANCE_S * fs)))
+    idx, props = find_peaks(x, distance=distance, prominence=0.1 * amplitude)
+    if len(idx) < cfg.SYNC_N_PEAKS:
+        return None
+    top = idx[np.argsort(props["prominences"])[-cfg.SYNC_N_PEAKS:]]
+    return np.sort(t[top])
 
-    # Final fallback: no prominence cut, ranking local maxima by height. This
-    # still returns only peaks inside the manually selected EMG window.
-    idx, _ = find_peaks(x, distance=max(1, int(round(0.20 * fs))))
-    if len(idx) >= cfg.SYNC_N_PEAKS:
-        chosen = idx[np.argsort(x[idx])[-cfg.SYNC_N_PEAKS:]]
-        return np.sort(t[chosen])
-
-    # If smoothing produced broad plateaus, select one maximum from each of
-    # three consecutive parts of the selected window. This guarantees a clear
-    # three-event result for a window that the user deliberately supplied.
-    parts = np.array_split(np.arange(len(x)), cfg.SYNC_N_PEAKS)
-    selected = [part[np.argmax(x[part])] for part in parts if len(part)]
-    if len(selected) == cfg.SYNC_N_PEAKS:
-        return np.sort(t[np.asarray(selected, dtype=int)])
-    return None
+    # Legacy adaptive detector (previous implementation; retained for later
+    # comparison or reactivation):
+    # distances_s = (
+    #     cfg.SYNC_EMG_MIN_PEAK_DISTANCE_S,
+    #     0.25,
+    # )
+    # prominence_fractions = (0.10, 0.05, 0.02, 0.01)
+    # for distance_s in distances_s:
+    #     distance = max(1, int(round(distance_s * fs)))
+    #     for fraction in prominence_fractions:
+    #         idx, props = find_peaks(
+    #             x,
+    #             distance=distance,
+    #             prominence=max(fraction * amplitude, np.finfo(float).eps),
+    #         )
+    #         if len(idx) >= cfg.SYNC_N_PEAKS:
+    #             chosen = idx[np.argsort(props["prominences"])[-cfg.SYNC_N_PEAKS:]]
+    #             return np.sort(t[chosen])
+    #
+    # idx, _ = find_peaks(x, distance=max(1, int(round(0.20 * fs))))
+    # if len(idx) >= cfg.SYNC_N_PEAKS:
+    #     chosen = idx[np.argsort(x[idx])[-cfg.SYNC_N_PEAKS:]]
+    #     return np.sort(t[chosen])
+    #
+    # parts = np.array_split(np.arange(len(x)), cfg.SYNC_N_PEAKS)
+    # selected = [part[np.argmax(x[part])] for part in parts if len(part)]
+    # if len(selected) == cfg.SYNC_N_PEAKS:
+    #     return np.sort(t[np.asarray(selected, dtype=int)])
+    # return None
 
 
 def suggest_analysis_window(direction, t, position, position_dips_s, offset_s=0.0):

@@ -285,12 +285,13 @@ def _saved_sync_result(path, condition):
 
 
 def _window_selection_result(data, condition, emg_channel, force_channel,
-                             emg_window, force_window):
+                             emg_window, force_window,
+                             manual_analysis_end_s=None):
     """Build the standalone record for one selected detection-window pair."""
     direction, bws = _parse_condition(condition)
     emg = data[direction]["emg"][bws]
     force = data[direction]["force"][bws]
-    return {
+    result = {
         "direction": direction,
         "bws_percent": bws,
         "force_file": force["file"],
@@ -308,6 +309,14 @@ def _window_selection_result(data, condition, emg_channel, force_channel,
         "detection_mode": "valleys",
         "position_channel": force_channel,
     }
+    if manual_analysis_end_s is not None:
+        try:
+            manual_analysis_end_s = float(manual_analysis_end_s)
+        except (TypeError, ValueError):
+            manual_analysis_end_s = None
+        if manual_analysis_end_s is not None and np.isfinite(manual_analysis_end_s):
+            result["manual_analysis_end_s"] = manual_analysis_end_s
+    return result
 
 
 def _window_selection_matches(saved, emg_channel, force_channel,
@@ -615,6 +624,57 @@ def _calculation_end_slider_state(data, condition, preview):
     low = max(low, start)
     high = max(high, end, low + 0.01)
     return low, high, min(max(end, low), high), False
+
+
+def _apply_horizontal_endpoint(preview, direction, selected_end):
+    """Apply the currently displayed horizontal endpoint before saving.
+
+    The endpoint can be changed by either clicking the synchronized position
+    plot or moving the endpoint slider. Reading the slider again in the save
+    callback makes the saved report robust to the two browser callbacks
+    completing in a different order.
+    """
+    if preview is None or str(direction).lower() != "horizontal":
+        return preview
+    try:
+        selected_end = float(selected_end)
+        start = float(preview["analysis_start_s"])
+        current_end = float(preview["analysis_end_s"])
+    except (KeyError, TypeError, ValueError):
+        return preview
+    if not np.isfinite(selected_end) or selected_end <= start:
+        return preview
+    if np.isclose(selected_end, current_end):
+        return preview
+
+    adjusted = dict(preview)
+    adjusted["analysis_end_s"] = selected_end
+    adjusted["analysis_window_method"] = (
+        "horizontal: manual endpoint selected on synchronized position plot"
+    )
+    adjusted["analysis_return_detected"] = True
+    return adjusted
+
+
+def _restore_saved_horizontal_endpoint(result, direction, saved_windows):
+    """Reapply a manual horizontal endpoint after peak/dip re-detection."""
+    if result is None or str(direction).lower() != "horizontal" or not saved_windows:
+        return result
+    try:
+        manual_endpoint = float(saved_windows.get("manual_analysis_end_s"))
+        start = float(result["analysis_start_s"])
+    except (TypeError, ValueError, KeyError):
+        return result
+    if not np.isfinite(manual_endpoint) or manual_endpoint <= start:
+        return result
+
+    adjusted = dict(result)
+    adjusted["analysis_end_s"] = manual_endpoint
+    adjusted["analysis_window_method"] = (
+        "horizontal: manual endpoint selected on synchronized position plot"
+    )
+    adjusted["analysis_return_detected"] = True
+    return adjusted
 
 
 def _crop_stage_state(data, condition, output_dir, participant):
@@ -988,10 +1048,13 @@ def create_sync_app(data, participant, output_dir):
         State("sync-force-channel", "value"),
         State("sync-emg-window", "value"),
         State("sync-force-window", "value"),
+        State("sync-preview-result", "data"),
+        State("sync-calculation-end", "value"),
         prevent_initial_call=False,
     )
     def prepare_sync_preview(index, _save_window_clicks, _preview_clicks,
-                             emg_channel, force_channel, emg_window, force_window):
+                             emg_channel, force_channel, emg_window, force_window,
+                             preview, calculation_end):
         index = min(max(int(index or 0), 0), len(conditions) - 1)
         condition = conditions[index]
 
@@ -1008,15 +1071,39 @@ def create_sync_app(data, participant, output_dir):
 
         saved_windows = _saved_window_selection(detection_report_path, condition)
         if ctx.triggered_id == "sync-save-windows":
+            direction, _bws = _parse_condition(condition)
+            preview_with_endpoint = _apply_horizontal_endpoint(
+                preview, direction, calculation_end
+            )
+            manual_endpoint = None
+            if (preview_with_endpoint is not None
+                    and direction == "horizontal"
+                    and str(preview_with_endpoint.get("analysis_window_method", ""))
+                    .startswith("horizontal: manual endpoint selected")):
+                manual_endpoint = preview_with_endpoint.get("analysis_end_s")
             selection = _window_selection_result(
-                data, condition, emg_channel, force_channel, emg_window, force_window
+                data, condition, emg_channel, force_channel, emg_window, force_window,
+                manual_analysis_end_s=manual_endpoint,
             )
             _save_detection_windows(detection_report_path, selection)
-            end_controls = _calculation_end_slider_state(data, condition, None)
+            if manual_endpoint is not None and preview_with_endpoint is not None:
+                low, high, value, _disabled = _calculation_end_slider_state(
+                    data, condition, preview_with_endpoint
+                )
+                # Keep the selected endpoint visible while the new peak/dip
+                # detection is waiting to be run; it is re-applied below.
+                end_controls = (low, high, value, True)
+                endpoint_note = (
+                    " The selected horizontal calculation endpoint was retained "
+                    "and will be reapplied after detection."
+                )
+            else:
+                end_controls = _calculation_end_slider_state(data, condition, None)
+                endpoint_note = ""
             return (
                 None,
                 f"Saved the peak/dip windows for {_condition_label(condition)}. "
-                "Now press Detect peaks/dips and show alignment.",
+                "Now press Detect peaks/dips and show alignment." + endpoint_note,
                 0.0, True, *end_controls,
             )
 
@@ -1039,6 +1126,7 @@ def create_sync_app(data, participant, output_dir):
             return (None, error + " Adjust the windows and try again.", 0.0,
                     True, *end_controls)
         direction, _bws = _parse_condition(condition)
+        result = _restore_saved_horizontal_endpoint(result, direction, saved_windows)
         if direction == "horizontal":
             if result.get("analysis_return_detected"):
                 window_note = (
@@ -1104,11 +1192,7 @@ def create_sync_app(data, participant, output_dir):
                     no_update)
 
         adjusted = dict(preview)
-        adjusted["analysis_end_s"] = selected_end
-        adjusted["analysis_window_method"] = (
-            "horizontal: manual endpoint selected on synchronized position plot"
-        )
-        adjusted["analysis_return_detected"] = True
+        adjusted = _apply_horizontal_endpoint(adjusted, direction, selected_end)
         return (
             adjusted,
             f"Manual horizontal calculation endpoint selected at {selected_end:.3f} s. "
@@ -1146,12 +1230,12 @@ def create_sync_app(data, participant, output_dir):
                 "Move the endpoint slider farther to the right."
             )
 
-        adjusted = dict(preview)
-        adjusted["analysis_end_s"] = selected_end
-        adjusted["analysis_window_method"] = (
-            "horizontal: manual endpoint selected with endpoint slider"
-        )
-        adjusted["analysis_return_detected"] = True
+        adjusted = _apply_horizontal_endpoint(preview, direction, selected_end)
+        if adjusted is not preview:
+            adjusted = dict(adjusted)
+            adjusted["analysis_window_method"] = (
+                "horizontal: manual endpoint selected with endpoint slider"
+            )
         return (
             adjusted,
             f"Manual horizontal calculation endpoint selected at {selected_end:.3f} s. "
@@ -1169,15 +1253,19 @@ def create_sync_app(data, participant, output_dir):
         State("sync-emg-window", "value"),
         State("sync-force-window", "value"),
         State("sync-preview-result", "data"),
+        State("sync-calculation-end", "value"),
         prevent_initial_call=True,
     )
     def navigate_sync(_save_clicks, _previous_clicks, index, emg_channel,
-                      force_channel, emg_window, force_window, preview):
+                      force_channel, emg_window, force_window, preview,
+                      calculation_end):
         index = min(max(int(index or 0), 0), len(conditions) - 1)
         if ctx.triggered_id == "sync-previous":
             return max(0, index - 1), "Moved back. The saved synchronization result will be loaded."
 
         condition = conditions[index]
+        direction, _bws = _parse_condition(condition)
+        preview = _apply_horizontal_endpoint(preview, direction, calculation_end)
         saved_windows = _saved_window_selection(detection_report_path, condition)
         if preview is None:
             return index, "Detect peaks/dips and inspect the alignment before saving."
